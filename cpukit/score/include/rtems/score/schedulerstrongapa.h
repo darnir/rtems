@@ -71,6 +71,10 @@ typedef struct {
    * @brief The associated ready queue of this node.
    */
   Scheduler_priority_Ready_queue Ready_queue;
+  /**
+   * Structure containing affinity set data and size
+   */
+  CPU_set_Control Affinity;
 } Scheduler_strong_APA_Node;
 
 /**
@@ -91,8 +95,9 @@ typedef struct {
     _Scheduler_default_Node_destroy, \
     _Scheduler_default_Release_job, \
     _Scheduler_default_Tick, \
-    _Scheduler_SMP_Start_idle \
-    SCHEDULER_OPERATION_DEFAULT_GET_SET_AFFINITY \
+    _Scheduler_SMP_Start_idle, \
+	_Scheduler_strong_APA_Get_affinity, \
+	_Scheduler_strong_APA_Set_affinity \
   }
 
 void _Scheduler_strong_APA_Initialize( const Scheduler_Control *scheduler );
@@ -127,6 +132,20 @@ Thread_Control *_Scheduler_strong_APA_Ask_for_help(
 Thread_Control *_Scheduler_strong_APA_Yield(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
+);
+
+bool _Scheduler_strong_APA_Get_affinity(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  size_t                   cpusetsize,
+  cpu_set_t               *cpuset
+);
+
+bool _Scheduler_strong_APA_Set_affinity(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  size_t                   cpusetsize,
+  const cpu_set_t         *cpuset
 );
 
 /** @} */

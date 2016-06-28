@@ -35,6 +35,19 @@ static Scheduler_strong_APA_Context *_Scheduler_strong_APA_Get_self(
   return (Scheduler_strong_APA_Context *) context;
 }
 
+/*
+ * This method returns the scheduler node for the specified thread
+ * as a scheduler specific type.
+ */
+static Scheduler_strong_APA_Node *
+_Scheduler_strong_APA_Thread_get_node(
+  Thread_Control *the_thread
+)
+{
+  return (Scheduler_strong_APA_Node *)
+    _Scheduler_Thread_get_node( the_thread );
+}
+
 static Scheduler_strong_APA_Node *
 _Scheduler_strong_APA_Node_downcast( Scheduler_Node *node )
 {
@@ -194,6 +207,11 @@ void _Scheduler_strong_APA_Node_initialize(
     &self->Bit_map,
     &self->Ready[ 0 ]
   );
+  /*
+   *  All we add is affinity information to the basic SMP node.
+   */
+  node->Affinity     = *_CPU_set_Default();
+  node->Affinity.set = &node->Affinity.preallocated;
 }
 
 static Scheduler_Node *_Scheduler_strong_APA_Get_highest_ready(
@@ -396,4 +414,71 @@ Thread_Control *_Scheduler_strong_APA_Yield(
     _Scheduler_strong_APA_Enqueue_fifo,
     _Scheduler_strong_APA_Enqueue_scheduled_fifo
   );
+}
+
+/*
+ * This is the public scheduler specific Change Priority operation.
+ */
+bool _Scheduler_strong_APA_Get_affinity(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  size_t                   cpusetsize,
+  cpu_set_t               *cpuset
+)
+{
+  Scheduler_strong_APA_Node *node =
+    _Scheduler_strong_APA_Thread_get_node( the_thread );
+
+  (void) scheduler;
+
+  if ( node->Affinity.setsize != cpusetsize ) {
+    return false;
+  }
+
+  CPU_COPY( cpuset, node->Affinity.set );
+  return true;
+}
+
+bool _Scheduler_strong_APA_Set_affinity(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  size_t                   cpusetsize,
+  const cpu_set_t         *cpuset
+)
+{
+  Scheduler_strong_APA_Node				*node;
+  States_Control                        current_state;
+
+  /*
+   * Validate that the cpset meets basic requirements.
+   */
+  if ( !_CPU_set_Is_valid( cpuset, cpusetsize ) ) {
+    return false;
+  }
+
+  node = _Scheduler_strong_APA_Thread_get_node( the_thread );
+
+  /*
+   * The old and new set are the same, there is no point in
+   * doing anything.
+   */
+  if ( CPU_EQUAL_S( cpusetsize, cpuset, node->Affinity.set ) )
+    return true;
+
+  current_state = the_thread->current_state;
+
+  if ( _States_Is_ready( current_state ) ) {
+    _Scheduler_strong_APA_Block( scheduler, the_thread );
+  }
+
+  CPU_COPY( node->Affinity.set, cpuset );
+
+  if ( _States_Is_ready( current_state ) ) {
+    /*
+     * FIXME: Do not ignore threads in need for help.
+     */
+    (void) _Scheduler_strong_APA_Unblock( scheduler, the_thread );
+  }
+
+  return true;
 }
