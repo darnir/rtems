@@ -57,6 +57,10 @@ $(PROJECT_INCLUDE)/machine/$(dirstamp):
 	@: > $(PROJECT_INCLUDE)/machine/$(dirstamp)
 PREINSTALL_DIRS += $(PROJECT_INCLUDE)/machine/$(dirstamp)
 
+$(PROJECT_INCLUDE)/machine/_align.h: machine/_align.h $(PROJECT_INCLUDE)/machine/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/machine/_align.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/machine/_align.h
+
 $(PROJECT_INCLUDE)/machine/cpu.h: machine/cpu.h $(PROJECT_INCLUDE)/machine/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/machine/cpu.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/machine/cpu.h
@@ -243,6 +247,15 @@ $(PROJECT_INCLUDE)/netinet/udp_var.h: netinet/udp_var.h $(PROJECT_INCLUDE)/netin
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/netinet/udp_var.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/netinet/udp_var.h
 
+$(PROJECT_INCLUDE)/netinet6/$(dirstamp):
+	@$(MKDIR_P) $(PROJECT_INCLUDE)/netinet6
+	@: > $(PROJECT_INCLUDE)/netinet6/$(dirstamp)
+PREINSTALL_DIRS += $(PROJECT_INCLUDE)/netinet6/$(dirstamp)
+
+$(PROJECT_INCLUDE)/netinet6/in6.h: netinet6/in6.h $(PROJECT_INCLUDE)/netinet6/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/netinet6/in6.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/netinet6/in6.h
+
 $(PROJECT_INCLUDE)/nfs/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/nfs
 	@: > $(PROJECT_INCLUDE)/nfs/$(dirstamp)
@@ -310,10 +323,22 @@ $(PROJECT_INCLUDE)/rtems/rtems_mii_ioctl.h: rtems/rtems_mii_ioctl.h $(PROJECT_IN
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/rtems_mii_ioctl.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/rtems_mii_ioctl.h
 
+$(PROJECT_INCLUDE)/rtems/rtems_netdb.h: rtems/rtems_netdb.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/rtems_netdb.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/rtems_netdb.h
+
+$(PROJECT_INCLUDE)/rtems/rtems_netinet_in.h: rtems/rtems_netinet_in.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/rtems_netinet_in.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/rtems_netinet_in.h
+
 $(PROJECT_INCLUDE)/sys/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/sys
 	@: > $(PROJECT_INCLUDE)/sys/$(dirstamp)
 PREINSTALL_DIRS += $(PROJECT_INCLUDE)/sys/$(dirstamp)
+
+$(PROJECT_INCLUDE)/sys/_sockaddr_storage.h: sys/_sockaddr_storage.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/_sockaddr_storage.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/sys/_sockaddr_storage.h
 
 $(PROJECT_INCLUDE)/sys/callout.h: sys/callout.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/callout.h

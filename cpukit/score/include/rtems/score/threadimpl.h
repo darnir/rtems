@@ -844,11 +844,7 @@ RTEMS_INLINE_ROUTINE void _Thread_Dispatch_update_heir(
 
   cpu_for_heir->heir = heir;
 
-  if ( cpu_for_heir == cpu_self ) {
-    cpu_self->dispatch_necessary = true;
-  } else {
-    _Per_CPU_Send_interrupt( cpu_for_heir );
-  }
+  _Thread_Dispatch_request( cpu_self, cpu_for_heir );
 }
 #endif
 
@@ -885,15 +881,7 @@ RTEMS_INLINE_ROUTINE void _Thread_Add_post_switch_action(
 
   action->handler = handler;
 
-#if defined(RTEMS_SMP)
-  if ( _Per_CPU_Get() == cpu_of_thread ) {
-    cpu_of_thread->dispatch_necessary = true;
-  } else {
-    _Per_CPU_Send_interrupt( cpu_of_thread );
-  }
-#else
-  cpu_of_thread->dispatch_necessary = true;
-#endif
+  _Thread_Dispatch_request( _Per_CPU_Get(), cpu_of_thread );
 
   _Chain_Append_if_is_off_chain_unprotected(
     &the_thread->Post_switch_actions.Chain,
@@ -1130,33 +1118,47 @@ RTEMS_INLINE_ROUTINE void *_Thread_Lock_acquire(
 )
 {
 #if defined(RTEMS_SMP)
-  SMP_ticket_lock_Control *lock;
+  SMP_ticket_lock_Control *lock_0;
 
   while ( true ) {
+    SMP_ticket_lock_Control *lock_1;
+
     _ISR_lock_ISR_disable( lock_context );
 
     /*
+     * We must use a load acquire here paired with the store release in
+     * _Thread_Lock_set_unprotected() to observe corresponding thread wait
+     * queue and thread wait operations.
+     *
      * We assume that a normal load of pointer is identical to a relaxed atomic
      * load.  Here, we may read an out-of-date lock.  However, only the owner
      * of this out-of-date lock is allowed to set a new one.  Thus, we read at
      * least this new lock ...
      */
-    lock = the_thread->Lock.current;
+    lock_0 = (SMP_ticket_lock_Control *) _Atomic_Load_uintptr(
+      &the_thread->Lock.current.atomic,
+      ATOMIC_ORDER_ACQUIRE
+    );
 
     _SMP_ticket_lock_Acquire(
-      lock,
+      lock_0,
       &_Thread_Executing->Lock.Stats,
       &lock_context->Lock_context.Stats_context
+    );
+
+    lock_1 = (SMP_ticket_lock_Control *) _Atomic_Load_uintptr(
+      &the_thread->Lock.current.atomic,
+      ATOMIC_ORDER_RELAXED
     );
 
     /*
      * ... here, and so on.
      */
-    if ( lock == the_thread->Lock.current ) {
-      return lock;
+    if ( lock_0 == lock_1 ) {
+      return lock_0;
     }
 
-    _Thread_Lock_release( lock, lock_context );
+    _Thread_Lock_release( lock_0, lock_context );
   }
 #else
   _ISR_Local_disable( lock_context->isr_level );
@@ -1175,7 +1177,11 @@ RTEMS_INLINE_ROUTINE void _Thread_Lock_set_unprotected(
   SMP_ticket_lock_Control *new_lock
 )
 {
-  the_thread->Lock.current = new_lock;
+  _Atomic_Store_uintptr(
+    &the_thread->Lock.current.atomic,
+    (uintptr_t) new_lock,
+    ATOMIC_ORDER_RELEASE
+  );
 }
 #endif
 
@@ -1197,7 +1203,7 @@ RTEMS_INLINE_ROUTINE void _Thread_Lock_set(
   ISR_lock_Context lock_context;
 
   _Thread_Lock_acquire_default_critical( the_thread, &lock_context );
-  _Assert( the_thread->Lock.current == &the_thread->Lock.Default );
+  _Assert( the_thread->Lock.current.normal == &the_thread->Lock.Default );
   _Thread_Lock_set_unprotected( the_thread, new_lock );
   _Thread_Lock_release_default_critical( the_thread, &lock_context );
 }
@@ -1305,8 +1311,10 @@ RTEMS_INLINE_ROUTINE Thread_Wait_flags _Thread_Wait_flags_get(
 }
 
 /**
- * @brief Tries to change the thread wait flags inside a critical section
- * (interrupts disabled).
+ * @brief Tries to change the thread wait flags with release semantics in case
+ * of success.
+ *
+ * Must be called inside a critical section (interrupts disabled).
  *
  * In case the wait flags are equal to the expected wait flags, then the wait
  * flags are set to the desired wait flags.
@@ -1318,22 +1326,24 @@ RTEMS_INLINE_ROUTINE Thread_Wait_flags _Thread_Wait_flags_get(
  * @retval true The wait flags were equal to the expected wait flags.
  * @retval false Otherwise.
  */
-RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_critical(
+RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_release(
   Thread_Control    *the_thread,
   Thread_Wait_flags  expected_flags,
   Thread_Wait_flags  desired_flags
 )
 {
+  _Assert( _ISR_Get_level() != 0 );
+
 #if defined(RTEMS_SMP)
   return _Atomic_Compare_exchange_uint(
     &the_thread->Wait.flags,
     &expected_flags,
     desired_flags,
-    ATOMIC_ORDER_RELAXED,
+    ATOMIC_ORDER_RELEASE,
     ATOMIC_ORDER_RELAXED
   );
 #else
-  bool success = the_thread->Wait.flags == expected_flags;
+  bool success = ( the_thread->Wait.flags == expected_flags );
 
   if ( success ) {
     the_thread->Wait.flags = desired_flags;
@@ -1344,30 +1354,44 @@ RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_critical(
 }
 
 /**
- * @brief Tries to change the thread wait flags.
+ * @brief Tries to change the thread wait flags with acquire semantics.
  *
- * @see _Thread_Wait_flags_try_change_critical().
+ * In case the wait flags are equal to the expected wait flags, then the wait
+ * flags are set to the desired wait flags.
+ *
+ * @param[in] the_thread The thread.
+ * @param[in] expected_flags The expected wait flags.
+ * @param[in] desired_flags The desired wait flags.
+ *
+ * @retval true The wait flags were equal to the expected wait flags.
+ * @retval false Otherwise.
  */
-RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change(
+RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_acquire(
   Thread_Control    *the_thread,
   Thread_Wait_flags  expected_flags,
   Thread_Wait_flags  desired_flags
 )
 {
   bool success;
-#if !defined(RTEMS_SMP)
+#if defined(RTEMS_SMP)
+  return _Atomic_Compare_exchange_uint(
+    &the_thread->Wait.flags,
+    &expected_flags,
+    desired_flags,
+    ATOMIC_ORDER_ACQUIRE,
+    ATOMIC_ORDER_ACQUIRE
+  );
+#else
   ISR_Level level;
 
   _ISR_Local_disable( level );
-#endif
 
-  success = _Thread_Wait_flags_try_change_critical(
+  success = _Thread_Wait_flags_try_change_release(
     the_thread,
     expected_flags,
     desired_flags
   );
 
-#if !defined(RTEMS_SMP)
   _ISR_Local_enable( level );
 #endif
 

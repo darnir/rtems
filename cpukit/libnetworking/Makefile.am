@@ -51,7 +51,8 @@ libnetworking_a_SOURCES += kern/kern_mib.c kern/kern_subr.c \
 
 include_machinedir = $(includedir)/machine
 
-include_machine_HEADERS = machine/cpu.h
+include_machine_HEADERS = machine/_align.h
+include_machine_HEADERS += machine/cpu.h
 include_machine_HEADERS += machine/cpufunc.h
 include_machine_HEADERS += machine/in_cksum.h
 include_machine_HEADERS += machine/vmparam.h
@@ -121,6 +122,12 @@ libnetworking_a_SOURCES += netinet/if_ether.c netinet/igmp.c netinet/in.c \
     netinet/udp_usrreq.c netinet/in_cksum_arm.h netinet/in_cksum_i386.h \
     netinet/in_cksum_m68k.h netinet/in_cksum_powerpc.h
 
+## netinet6
+
+include_netinet6dir = $(includedir)/netinet6
+
+include_netinet6_HEADERS = netinet6/in6.h
+
 ## nfs
 
 include_nfsdir = $(includedir)/nfs
@@ -149,6 +156,8 @@ include_rtems_HEADERS += rtems/tftp.h
 include_rtems_HEADERS += rtems/ftpfs.h
 include_rtems_HEADERS += rtems/mkrootfs.h
 include_rtems_HEADERS += rtems/rtems_mii_ioctl.h
+include_rtems_HEADERS += rtems/rtems_netdb.h
+include_rtems_HEADERS += rtems/rtems_netinet_in.h
 
 libnetworking_a_SOURCES += rtems/sghostname.c \
     rtems/rtems_glue.c rtems/rtems_malloc_mbuf.c rtems/rtems_syscall.c \
@@ -164,7 +173,8 @@ libnetworking_a_SOURCES += rtems/sghostname.c \
 
 include_sysdir = $(includedir)/sys
 
-include_sys_HEADERS = sys/callout.h
+include_sys_HEADERS = sys/_sockaddr_storage.h
+include_sys_HEADERS += sys/callout.h
 include_sys_HEADERS += sys/conf.h
 include_sys_HEADERS += sys/domain.h
 include_sys_HEADERS += sys/kernel.h
@@ -213,7 +223,7 @@ include_HEADERS += ifaddrs.h
 libc_a_SOURCES = libc/base64.c \
     libc/gethostbydns.c libc/gethostbyht.c libc/gethostbynis.c \
     libc/gethostnamadr.c libc/getnetbydns.c libc/getnetbyht.c \
-    libc/getnetbynis.c libc/getnetnamadr.c libc/getproto.c \
+    libc/getnetbynis.c libc/getnetnamadr.c libc/getnameinfo.c libc/getproto.c \
     libc/getprotoent.c libc/getprotoname.c libc/getservbyname.c \
     libc/getservbyport.c libc/getservent.c libc/herror.c libc/inet_addr.c \
     libc/inet_lnaof.c libc/inet_makeaddr.c libc/inet_netof.c \

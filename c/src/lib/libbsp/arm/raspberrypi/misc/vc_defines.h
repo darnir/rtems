@@ -30,7 +30,7 @@
  * @{
  */
 
- /**
+/**
  * @name Mailbox Property tags (ARM <-> VC)
  *
  * @{
@@ -51,7 +51,6 @@
  *
  */
 typedef struct {
-
   /**
    * @brief Buffer Size
    *
@@ -69,7 +68,6 @@ typedef struct {
    */
   uint32_t buf_code;
 } bcm2835_mbox_buf_hdr;
-
 
 /**
  * @brief Tag Header
@@ -96,24 +94,24 @@ typedef struct {
   uint32_t val_len;
 } bcm2835_mbox_tag_hdr;
 
-#define BCM2835_MBOX_INIT_BUF(_m_) { \
-    memset((_m_), 0, sizeof(*(_m_))); \
-    (_m_)->hdr.buf_size = sizeof(*(_m_)); \
-    (_m_)->hdr.buf_code = BCM2835_MBOX_BUF_CODE_PROCESS_REQUEST; \
-    (_m_)->end_tag = 0; \
-  }
+#define BCM2835_MBOX_INIT_BUF( _m_ ) { \
+    memset( ( _m_ ), 0, sizeof( *( _m_ ) ) ); \
+    ( _m_ )->hdr.buf_size = sizeof( *( _m_ ) ); \
+    ( _m_ )->hdr.buf_code = BCM2835_MBOX_BUF_CODE_PROCESS_REQUEST; \
+    ( _m_ )->end_tag = 0; \
+}
 
-#define BCM2835_MBOX_INIT_TAG(_t_, _id_) { \
-    (_t_)->tag_hdr.tag = _id_; \
-    (_t_)->tag_hdr.val_buf_size = sizeof((_t_)->body); \
-    (_t_)->tag_hdr.val_len = sizeof((_t_)->body.req); \
-  }
+#define BCM2835_MBOX_INIT_TAG( _t_, _id_ ) { \
+    ( _t_ )->tag_hdr.tag = _id_; \
+    ( _t_ )->tag_hdr.val_buf_size = sizeof( ( _t_ )->body ); \
+    ( _t_ )->tag_hdr.val_len = sizeof( ( _t_ )->body.req ); \
+}
 
-#define BCM2835_MBOX_INIT_TAG_NO_REQ(_t_, _id_) { \
-    (_t_)->tag_hdr.tag = _id_; \
-    (_t_)->tag_hdr.val_buf_size = sizeof((_t_)->body); \
-    (_t_)->tag_hdr.val_len = 0; \
-  }
+#define BCM2835_MBOX_INIT_TAG_NO_REQ( _t_, _id_ ) { \
+    ( _t_ )->tag_hdr.tag = _id_; \
+    ( _t_ )->tag_hdr.val_buf_size = sizeof( ( _t_ )->body ); \
+    ( _t_ )->tag_hdr.val_len = 0; \
+}
 
 /*
  * Mailbox buffers has to be aligned to 16 bytes because
@@ -131,14 +129,34 @@ typedef struct {
  * Cache line length is 64 bytes for RPi2 Cortex-A7 data cache
  * so align buffers to this value.
  */
-#define BCM2835_MBOX_BUF_ALIGN_ATTRIBUTE __attribute__((aligned (64)))
+#define BCM2835_MBOX_BUF_ALIGN_ATTRIBUTE __attribute__( ( aligned( 64 ) ) )
 
 /* Video Core */
 #define BCM2835_MAILBOX_TAG_FIRMWARE_REVISION   0x00000001
+typedef struct {
+  bcm2835_mbox_tag_hdr tag_hdr;
+  union {
+    struct {
+    } req;
+    struct {
+      uint32_t rev;
+    } resp;
+  } body;
+} bcm2835_mbox_tag_get_fw_rev;
 
 /* Hardware */
 #define BCM2835_MAILBOX_TAG_GET_BOARD_MODEL     0x00010001
 #define BCM2835_MAILBOX_TAG_GET_BOARD_VERSION   0x00010002
+typedef struct {
+  bcm2835_mbox_tag_hdr tag_hdr;
+  union {
+    struct {
+    } req;
+    struct {
+      uint32_t spec;
+    } resp;
+  } body;
+} bcm2835_mbox_tag_get_board_spec;
 
 #if (BSP_IS_RPI2 == 1)
 #define BCM2836_MAILBOX_BOARD_V_2_B             0x4
@@ -197,7 +215,7 @@ typedef struct {
     struct {
     } req;
     struct {
-      uint8_t cmdline[1024];
+      uint8_t cmdline[ 1024 ];
     } resp;
   } body;
 } bcm2835_mbox_tag_get_cmd_line;
@@ -237,8 +255,11 @@ typedef struct {
   } body;
 } bcm2835_mbox_tag_power_state;
 
+#ifndef BCM2835_MAILBOX_SET_POWER_STATE_REQ_ON
+/* Value is defined as a part of public VideoCore API */
 #define BCM2835_MAILBOX_SET_POWER_STATE_REQ_ON    (1 << 0)
 #define BCM2835_MAILBOX_SET_POWER_STATE_REQ_WAIT  (1 << 1)
+#endif
 
 /* Clocks */
 #define BCM2835_MAILBOX_UCID_CLOCK_RESERVED          0x000000000

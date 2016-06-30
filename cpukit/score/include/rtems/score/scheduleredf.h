@@ -24,6 +24,8 @@
 #include <rtems/score/schedulerpriority.h>
 #include <rtems/score/rbtree.h>
 
+#include <limits.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,7 +37,12 @@ extern "C" {
  */
 /**@{*/
 
-#define SCHEDULER_EDF_MAXIMUM_PRIORITY 0x7fffffff
+/*
+ * Actually the EDF scheduler supports a maximum priority of
+ * 0x7fffffffffffffff, but the user API is limited to uint32_t or int for
+ * thread priorities.  Ignore ILP64 targets for now.
+ */
+#define SCHEDULER_EDF_MAXIMUM_PRIORITY INT_MAX
 
 /**
  *  Entry points for the Earliest Deadline First Scheduler.
@@ -58,15 +65,6 @@ extern "C" {
     _Scheduler_default_Start_idle    /* start idle entry point */ \
     SCHEDULER_OPERATION_DEFAULT_GET_SET_AFFINITY \
   }
-
-/**
- * This is just a most significant bit of Priority_Control type. It
- * distinguishes threads which are deadline driven (priority
- * represented by a lower number than @a SCHEDULER_EDF_PRIO_MSB) from those
- * ones who do not have any deadlines and thus are considered background
- * tasks.
- */
-#define SCHEDULER_EDF_PRIO_MSB 0x80000000
 
 typedef struct {
   /**
