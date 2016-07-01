@@ -23,6 +23,7 @@
 #include <rtems/score/scheduler.h>
 #include <rtems/score/cpusetimpl.h>
 #include <rtems/score/smpimpl.h>
+#include <rtems/score/status.h>
 #include <rtems/score/threadimpl.h>
 
 #ifdef __cplusplus
@@ -454,17 +455,20 @@ RTEMS_INLINE_ROUTINE Priority_Control _Scheduler_Unmap_priority(
  * destroyed.
  *
  * @param[in] scheduler The scheduler instance.
- * @param[in] the_thread The thread containing the scheduler node.
+ * @param[in] node The scheduler node to initialize.
+ * @param[in] the_thread The thread of the scheduler node to initialize.
  * @param[in] priority The thread priority.
  */
 RTEMS_INLINE_ROUTINE void _Scheduler_Node_initialize(
   const Scheduler_Control *scheduler,
+  Scheduler_Node          *node,
   Thread_Control          *the_thread,
   Priority_Control         priority
 )
 {
   ( *scheduler->Operations.node_initialize )(
     scheduler,
+    node,
     the_thread,
     priority
   );
@@ -477,14 +481,14 @@ RTEMS_INLINE_ROUTINE void _Scheduler_Node_initialize(
  * after a corresponding _Scheduler_Node_initialize().
  *
  * @param[in] scheduler The scheduler instance.
- * @param[in] the_thread The thread containing the scheduler node.
+ * @param[in] node The scheduler node to destroy.
  */
 RTEMS_INLINE_ROUTINE void _Scheduler_Node_destroy(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
+  Scheduler_Node          *node
 )
 {
-  ( *scheduler->Operations.node_destroy )( scheduler, the_thread );
+  ( *scheduler->Operations.node_destroy )( scheduler, node );
 }
 
 /**
@@ -576,51 +580,6 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_Has_processor_ownership(
   (void) scheduler;
   (void) cpu_index;
 
-  return true;
-#endif
-}
-
-RTEMS_INLINE_ROUTINE bool _Scheduler_Set(
-  const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
-)
-{
-#if defined(RTEMS_SMP)
-  const Scheduler_Control *current_scheduler;
-  States_Control           current_state;
-
-  current_scheduler = _Scheduler_Get( the_thread );
-
-  if ( current_scheduler == scheduler ) {
-    return true;
-  }
-
-  if ( _Thread_Owns_resources( the_thread ) ) {
-    return false;
-  }
-
-  current_state = the_thread->current_state;
-
-  if ( _States_Is_ready( current_state ) ) {
-    _Scheduler_Block( the_thread );
-  }
-
-  _Scheduler_Node_destroy( current_scheduler, the_thread );
-  the_thread->Scheduler.own_control = scheduler;
-  the_thread->Scheduler.control = scheduler;
-  _Scheduler_Node_initialize(
-    scheduler,
-    the_thread,
-    the_thread->current_priority
-  );
-
-  if ( _States_Is_ready( current_state ) ) {
-    _Scheduler_Unblock( the_thread );
-  }
-
-  return true;
-#else
-  (void) scheduler;
   return true;
 #endif
 }
@@ -1470,6 +1429,66 @@ RTEMS_INLINE_ROUTINE void _Scheduler_Update_heir(
     _Thread_Heir = new_heir;
     _Thread_Dispatch_necessary = true;
   }
+}
+
+RTEMS_INLINE_ROUTINE Status_Control _Scheduler_Set(
+  const Scheduler_Control *new_scheduler,
+  Thread_Control          *the_thread,
+  Priority_Control         priority
+)
+{
+  Scheduler_Node *own_node;
+
+  if (
+    _Thread_Owns_resources( the_thread )
+      || the_thread->Wait.queue != NULL
+  ) {
+    return STATUS_RESOURCE_IN_USE;
+  }
+
+  the_thread->current_priority = priority;
+  the_thread->real_priority = priority;
+  the_thread->Start.initial_priority = priority;
+
+  own_node = _Scheduler_Thread_get_own_node( the_thread );
+
+#if defined(RTEMS_SMP)
+  {
+    const Scheduler_Control *old_scheduler;
+
+    old_scheduler = _Scheduler_Get( the_thread );
+
+    if ( old_scheduler != new_scheduler ) {
+      States_Control current_state;
+
+      current_state = the_thread->current_state;
+
+      if ( _States_Is_ready( current_state ) ) {
+        _Scheduler_Block( the_thread );
+      }
+
+      _Scheduler_Node_destroy( old_scheduler, own_node );
+      the_thread->Scheduler.own_control = new_scheduler;
+      the_thread->Scheduler.control = new_scheduler;
+      _Scheduler_Node_initialize(
+        new_scheduler,
+        own_node,
+        the_thread,
+        priority
+      );
+
+      if ( _States_Is_ready( current_state ) ) {
+        _Scheduler_Unblock( the_thread );
+      }
+
+      return STATUS_SUCCESSFUL;
+    }
+  }
+#endif
+
+  _Scheduler_Node_set_priority( own_node, priority, false );
+  _Scheduler_Update_priority( the_thread );
+  return STATUS_SUCCESSFUL;
 }
 
 /** @} */

@@ -183,7 +183,10 @@ static void _Thread_Free( Thread_Control *the_thread )
   _User_extensions_Thread_delete( the_thread );
   _User_extensions_Destroy_iterators( the_thread );
   _ISR_lock_Destroy( &the_thread->Keys.Lock );
-  _Scheduler_Node_destroy( _Scheduler_Get( the_thread ), the_thread );
+  _Scheduler_Node_destroy(
+    _Scheduler_Get( the_thread ),
+    _Scheduler_Thread_get_own_node( the_thread )
+  );
   _ISR_lock_Destroy( &the_thread->Timer.Lock );
 
   /*
@@ -357,6 +360,10 @@ void _Thread_Life_action_handler(
 
     _Thread_Make_zombie( executing );
 
+    /* FIXME: Workaround for https://devel.rtems.org/ticket/2751 */
+    cpu_self->dispatch_necessary = true;
+
+    _Assert( cpu_self->heir != executing );
     _Thread_Dispatch_enable( cpu_self );
     RTEMS_UNREACHABLE();
   }

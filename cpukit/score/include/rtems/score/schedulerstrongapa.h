@@ -104,6 +104,7 @@ void _Scheduler_strong_APA_Initialize( const Scheduler_Control *scheduler );
 
 void _Scheduler_strong_APA_Node_initialize(
   const Scheduler_Control *scheduler,
+  Scheduler_Node          *node,
   Thread_Control          *the_thread,
   Priority_Control         priority
 );
