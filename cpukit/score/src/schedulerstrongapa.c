@@ -209,8 +209,8 @@ void _Scheduler_strong_APA_Node_initialize(
   /*
    *  All we add is affinity information to the basic SMP node.
    */
-  node->Affinity     = *_CPU_set_Default();
-  node->Affinity.set = &node->Affinity.preallocated;
+  the_node->Affinity     = *_CPU_set_Default();
+  the_node->Affinity.set = &the_node->Affinity.preallocated;
 }
 
 static Scheduler_Node *_Scheduler_strong_APA_Get_highest_ready(
